@@ -1,14 +1,14 @@
 import numpy as np
 class CPU:
-    def __init__(self):
-        self.memory = np.array(4096, dtype=np.uint8) # Memory is 4kb
-        self.display = np.array((32, 64), dtype=np.uint8)
-        self.pc = 0x050 # ranges from 0x0000 to 0x1000
+    def __init__(self, rom_filename):
+        self.memory = np.zeros(4096, dtype=np.uint16) # Memory is 4kb
+        self.display = np.zeros((32, 64), dtype=np.uint8)
+        self.pc = 0x0200 # ranges from 0x0000 to 0x1000
         self.I = 0x0000 #16 bit index register
         self.delayTimer = 0x00 # 8 bit delay timer
         self.soundTimer = 0x00 # 8 bit osund timer
-        self.registers = np.array(16, dtype=np.uint8) #Variable registers
-        self.load_font() #Load font into memory
+        self.registers = np.zeros(16, dtype=np.uint8) #Variable registers
+        self.load_rom(rom_filename) #Load font into memory
         self.stack = []
     
     def load_font(self):
@@ -33,6 +33,13 @@ class CPU:
 
         for i, font in enumerate(CHIP8_FONTSET):
             self.memory[self.pc + i] = font
+    
+    def load_rom(self, filename):
+        with open(filename, 'rb') as file:
+            rom_bytes = file.read()
+        rom_array = np.frombuffer(rom_bytes, dtype=np.uint8)
+        for i, byte in enumerate(rom_array):
+            self.memory[0x200 + i] = byte
 
     #Opcode functions
     def clear_screen(self):
@@ -62,17 +69,31 @@ class CPU:
         self.registers[x] = self.registers[x] + nn
 
     def set_index_register(self, nnn):
-        pass
+        self.I = nnn
 
     def dxyn(self, x, y, n):
-        pass
+        vx = self.registers[x]% 64
+        vy = self.registers[y] % 32
+        self.registers[0xF] = 0 #Set collision flag to 0
+        for row in range(n):
+            current_byte = self.memory[self.I + row]
+            for col in range(8):
+                bit = (current_byte >> (7 - col)) & 1 #Get current bit
+                if vy + row < 32 and vx + col < 64:
+                    old_pixel = self.display[vy + row][vx + col]
+                    if old_pixel ^ bit == 1: #Check for collision set flag as needed
+                        self.registers[0xF] = 1
+                    self.display[vy + row][(vx + col)] ^= bit
     
     #Fetch decode execute loop
     def fetch(self):
         opcode = (self.memory[self.pc] << 8) | self.memory[self.pc + 1]
         self.pc += 2
+        return opcode
 
-    def decode_execute(self, opcode):
+    def decode_execute(self):
+        opcode = self.fetch()
+        opcode_decoded = True
         #no var cases
         if(opcode == 0x00E0):
             return self.clear_screen
@@ -92,9 +113,17 @@ class CPU:
             case 0x7000:
                 self.add_register_vx(x, nn)
             case 0xA000:
-                self.add_register_vx(nnn)
+                self.set_index_register(nnn)
             case 0xD000:
                 self.dxyn(x, y, n)
+            case _:
+                opcode_decoded = False
+        if opcode_decoded:
+            print(f"Opcode: {opcode:04X}")
+        else:
+            print(f"Opcode {opcode:04X} couldnt be decoded")
+    def get_display(self):
+        return self.display
             
 
 
