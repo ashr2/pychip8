@@ -34,11 +34,70 @@ class CPU:
         for i, font in enumerate(CHIP8_FONTSET):
             self.memory[self.pc + i] = font
 
+    #Opcode functions
+    def clear_screen(self):
+        for row in range(len(self.display)):
+            for col in range(len(row)):
+                self.display[row][col] = 0
+
+    def pop_stack(self):
+        pass
+
+    def jump(self, nnn):
+        self.pc = nnn
+
+    def pop_stack_addr(self, nnn):
+        pass
+
+    def set_index(self, nnn):
+        self.I = nnn
+
+    def jump_with_offset(self, nnn):
+        pass
+
+    def set_register_vx(self, x, nn):
+        self.registers[x] = nn
+
+    def add_register_vx(self, x, nn):
+        self.registers[x] = self.registers[x] + nn
+
+    def set_index_register(self, nnn):
+        pass
+
+    def dxyn(self, x, y, n):
+        pass
+    
+    #Fetch decode execute loop
     def fetch(self):
         opcode = (self.memory[self.pc] << 8) | self.memory[self.pc + 1]
         self.pc += 2
+
+    def decode_execute(self, opcode):
+        #no var cases
+        if(opcode == 0x00E0):
+            return self.clear_screen
     
-    def decode(self, opcode):
-        pass
+        nnn = opcode & 0x0FFF
+        nn = opcode & 0x00FF
+        n = opcode & 0x000F
+        x = (opcode & 0x0F00) >> 8
+        y = (opcode & 0x00F0) >> 4
+        match opcode & 0xF000:
+            case 0x1000:
+                self.jump(nnn)
+            # case 0x2000:
+            #     return self.pop_stack_addr(nnn)
+            case 0x6000:
+                self.set_register_vx(x, nn)
+            case 0x7000:
+                self.add_register_vx(x, nn)
+            case 0xA000:
+                self.add_register_vx(nnn)
+            case 0xD000:
+                self.dxyn(x, y, n)
+            
+
+
+    
                 
                 
