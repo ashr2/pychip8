@@ -1,7 +1,7 @@
 import numpy as np
 import random
 class CPU:
-    def __init__(self, rom_filename, super_chip=False):
+    def __init__(self, rom_filename, super_chip=False, debugging=False):
         self.memory = np.zeros(4096, dtype=np.uint16) # Memory is 4kb
         self.display = np.zeros((32, 64), dtype=np.uint8)
         self.pc = 0x0200 # ranges from 0x0000 to 0x1000
@@ -14,7 +14,7 @@ class CPU:
         self.stack = []
         self.load_font() #Load font into memory
         self.super_chip = super_chip #Super chip configuration
-    
+        self.debugging = False
     def load_font(self):
         CHIP8_FONTSET = [
             0xF0, 0x90, 0x90, 0x90, 0xF0,  # 0
@@ -146,7 +146,8 @@ class CPU:
             self.registers[0xF] = 1
         else:
             self.registers[0xF] = 0
-        self.registers[x] = self.registers[x] - self.registers[y]
+        difference = int(self.registers[x]) - int(self.registers[y])
+        self.registers[x] = difference & 0xFF
 
     def vy_minus_vx(self, x, y):
         vx = self.registers[x]
@@ -155,7 +156,8 @@ class CPU:
             self.registers[0xF] = 1
         else:
             self.registers[0xF] = 0
-        self.registers[x] = self.registers[y] - self.registers[x]
+        difference = int(self.registers[y]) - int(self.registers[x])
+        self.registers[x] = difference & 0xFF
 
     def shift_right(self, x, y):
         if(not(self.super_chip)):
@@ -192,11 +194,11 @@ class CPU:
     
     def get_key(self, x):
         try:
-            registerPressed = self.registers.index(1)
+            registerPressed = list(self.keys_pressed).index(1)
             self.registers[x] = registerPressed
         except ValueError:
             self.pc -= 2
-      
+     
     def set_i_to_font(self, x):
         vx = self.registers[x]
         self.I = 0x050 + 5 * vx
@@ -291,6 +293,8 @@ class CPU:
                         opcode_decoded = False
             case 0xF000:
                 match opcode & 0xF0FF:
+                    case 0xF00A:
+                        self.get_key(x)
                     case 0xF007:
                         self.set_vx_to_delay_timer(x)
                     case 0xF015:
@@ -316,10 +320,13 @@ class CPU:
                     self.pop_stack()
                 else:
                     opcode_decoded = False
-        if opcode_decoded:
-            print(f"Opcode {opcode:04X} decoded")
-        else:
-            print(f"Opcode {opcode:04X} not decoded successfully")
+        
+        #print opcodes if debugging on
+        if self.debugging:
+            if opcode_decoded:
+                print(f"Opcode {opcode:04X} decoded")
+            else:
+                print(f"Opcode {opcode:04X} not decoded successfully")
 
         if self.delayTimer > 0:
             self.delayTimer -= 1
